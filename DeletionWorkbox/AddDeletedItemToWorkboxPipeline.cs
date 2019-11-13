@@ -19,11 +19,18 @@ namespace DeletionWorkbox
 
                     if (String.IsNullOrEmpty(ids) || String.IsNullOrEmpty(databaseName)) return;
 
+                    var item = db.GetItem(ids);
+                    var path = item.Paths.Path.ToLower();
+
+                    if (!path.StartsWith("/sitecore/content/")) return;
+
                     if (databaseName.ToLower() == "master")
                     {
                         var workbox = db.GetItem("/sitecore/system/Modules/Deletion Workbox/Workbox");
                         if (workbox == null) return;
+                        workbox.Editing.BeginEdit();
                         workbox.Fields["Deleted Items"].Value += ids + "|";
+                        workbox.Editing.EndEdit();
                     }
 
                 }
@@ -35,3 +42,4 @@ namespace DeletionWorkbox
             }
         }
     }
+}
