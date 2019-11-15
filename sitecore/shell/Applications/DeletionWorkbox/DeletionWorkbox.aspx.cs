@@ -9,7 +9,6 @@ using System.Net;
 using System.IO;
 using System.ServiceModel;
 using System.Web.Configuration;
-using Kofax.Library.LicenseService;
 using Sitecore.Diagnostics;
 using Sitecore.Data;
 using Sitecore.Collections;
