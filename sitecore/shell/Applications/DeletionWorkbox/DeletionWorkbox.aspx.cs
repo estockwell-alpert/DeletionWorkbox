@@ -17,18 +17,38 @@ using Sitecore.Data.Items;
 using Sitecore.Data.Proxies;
 using Sitecore.Exceptions;
 using Sitecore.SecurityModel;
+using Sitecore.Publishing;
 
 namespace DeletionWorkbox
 {
     public partial class DeletionWorkboxPage : System.Web.UI.Page
     {
         public Database db = Sitecore.Configuration.Factory.GetDatabase("master");
-        public ItemList publishingTargets;
-        List<Item> workboxItems = new List<Item>();
+        public ItemList publishingTargets = new ItemList();
 
         protected void Page_Load(object sender, EventArgs e)
         {
-            var publishingTargets = Sitecore.Publishing.PublishManager.GetPublishingTargets(db);
+            if (Sitecore.Context.User == null || Sitecore.Context.User.Name.ToLower() == "sitecore\\anonymous")
+            {
+                phLoggedIn.Visible = false;
+                phNotLoggedIn.Visible = true;
+            }
+
+            publishingTargets = Sitecore.Publishing.PublishManager.GetPublishingTargets(db);
+
+            if (!IsPostBack)
+            {
+                rptTargetDatabases.DataSource = publishingTargets;
+                rptTargetDatabases.DataBind();
+
+                SetWorkbox();  
+            }
+        }
+
+        public void SetWorkbox()
+        {
+            //security
+            var user = Sitecore.Context.User;
 
             var workbox = db.GetItem("/sitecore/system/Modules/Deletion Workbox/Workbox");
             if (workbox == null) return;
@@ -36,59 +56,16 @@ namespace DeletionWorkbox
             var ids = workbox.Fields["Deleted Items"].Value.Split('|').Where(x => !String.IsNullOrEmpty(x));
             if (!ids.Any()) return;
 
-            rptItemList.DataSource = ids;
-            rptItemList.DataBind();
-        }
-
-        protected void rptItemList_ItemDataBound(object sender, RepeaterItemEventArgs e)
-        {
-            String id = e.Item.DataItem as String;
-
-            // DO NOT ADD if this item exists in master
-            if (db.GetItem(id) != null) return;
-
-            List<string> databases = new List<string>();
-
-            Item item = null;
-            foreach (var target in publishingTargets)
+            var items = new List<Item>();
+            foreach (var id in ids)
             {
-                var targetDatabaseName = target["Target database"];
-                if (string.IsNullOrEmpty(targetDatabaseName))
-                    continue;
-
-                var targetDatabase = Sitecore.Configuration.Factory.GetDatabase(targetDatabaseName);
-                if (targetDatabase == null)
-                    continue;
-
-                var tempItem = targetDatabase.GetItem(id);
-                if (tempItem != null)
+                if (db.GetItem(id) != null)
                 {
-                    item = tempItem;
-                    databases.Add(targetDatabaseName);
+                    // let's remove this from the saved settings
+                    UpdateSavedState(id);
+                    continue;
                 }
-            }
 
-            if (item == null) return;
-            workboxItems.Add(item);
-
-            CheckBox checkbox = e.Item.FindControl("chkDeleteItem") as CheckBox;
-            Literal name = e.Item.FindControl("litName") as Literal;
-            Literal info = e.Item.FindControl("litDatabaseInfo") as Literal;
-            Button button = e.Item.FindControl("btnDeleteItem") as Button;
-
-            checkbox.Attributes["data-id"] = button.Attributes["data-id"] = item.ID.ToString();
-            name.Text = item.Name;
-            info.Text = "Databases: " + String.Join(",", databases);
-        }
-
-        protected void rptItemList_ItemCommand(object source, RepeaterCommandEventArgs e)
-        {
-            if (e.CommandName == "DeleteItem")
-            {
-                Button button = e.Item.FindControl("btnDeleteItem") as Button;
-                var id = button.Attributes["data-id"];
-
-                //ToDo: Phase 2 Target Database Selection
                 foreach (var target in publishingTargets)
                 {
                     var targetDatabaseName = target["Target database"];
@@ -99,10 +76,162 @@ namespace DeletionWorkbox
                     if (targetDatabase == null)
                         continue;
 
-                    var item = targetDatabase.GetItem(id);
-                    item.Delete();
+                    var tempItem = targetDatabase.GetItem(id);
+                    if (tempItem != null && !items.Any(x => x.ID.Equals(tempItem.ID)) && tempItem.Security.CanRead(user) && tempItem.Security.CanDelete(user))
+                    {
+                        items.Add(tempItem);
+                        continue;
+                    }
                 }
             }
+
+            items = items.OrderBy(x => x.Paths.Path).ToList();
+
+            rptItemList.DataSource = items;
+            rptItemList.DataBind();
+        }
+
+        protected void UpdateSavedState(string id)
+        {
+            var workbox = db.GetItem("/sitecore/system/Modules/Deletion Workbox/Workbox");
+            if (workbox == null) return;
+
+            using (new SecurityDisabler())
+            {
+                workbox.Editing.BeginEdit();
+                workbox.Fields["Deleted Items"].Value = workbox.Fields["Deleted Items"].Value.ToLower().Replace(id.ToLower() + "|", "");
+                workbox.Editing.EndEdit();
+            }
+        }
+
+        protected void rptItemList_ItemDataBound(object sender, RepeaterItemEventArgs e)
+        {
+            Item item = e.Item.DataItem as Item;
+
+            List<string> databases = new List<string>();
+
+            foreach (var target in publishingTargets)
+            {
+                var targetDatabaseName = target["Target database"];
+                if (string.IsNullOrEmpty(targetDatabaseName))
+                    continue;
+
+                var targetDatabase = Sitecore.Configuration.Factory.GetDatabase(targetDatabaseName);
+                if (targetDatabase == null)
+                    continue;
+
+                var tempItem = targetDatabase.GetItem(item.ID.ToString());
+                if (tempItem != null)
+                {
+                    databases.Add(targetDatabaseName);
+                }
+            }
+
+            if (item == null)
+            {
+                PlaceHolder ph = e.Item.FindControl("phItem") as PlaceHolder;
+                ph.Visible = false;
+                return;
+            }          
+
+            CheckBox checkbox = e.Item.FindControl("chkDeleteItem") as CheckBox;
+            Literal name = e.Item.FindControl("litName") as Literal;
+            Literal path = e.Item.FindControl("litPath") as Literal;
+            Literal info = e.Item.FindControl("litDatabaseInfo") as Literal;
+            LinkButton button = e.Item.FindControl("btnDeleteItem") as LinkButton;
+
+            //check if it's in recycle bin
+            var inRecycleBin = CheckRecycleBin(item.ID.ToString());
+            if (!inRecycleBin)
+            {
+                LinkButton restoreButton = e.Item.FindControl("btnRestoreItem") as LinkButton;
+                restoreButton.Visible = false;
+            }
+
+            checkbox.Attributes["data-id"] = button.Attributes["data-id"] = item.ID.ToString();
+            name.Text = item.Name;
+            path.Text = item.Paths.FullPath + " - <span class='item-id'>" + item.ID.ToString() + "</span>";
+            info.Text = "Databases: " + String.Join(",", databases);
+        }
+
+        protected List<Database> GetSelectedPublishingTargets()
+        {
+            List<Database> targets = new List<Database>();
+            for (var i = 0; i < rptTargetDatabases.Items.Count; i++)
+            {
+                CheckBox chk = (CheckBox)rptTargetDatabases.Items[i].FindControl("chkSelectTarget");
+                if (chk.Checked)
+                {
+                    Literal name = (Literal)rptTargetDatabases.Items[i].FindControl("litTarget");
+                    var database = Sitecore.Configuration.Factory.GetDatabase(name.Text);
+                    targets.Add(database);
+                }
+            }
+            return targets;
+        }
+
+        protected void rptItemList_ItemCommand(object source, RepeaterCommandEventArgs e)
+        {
+            var targets = GetSelectedPublishingTargets();
+
+            LinkButton button = e.Item.FindControl("btnDeleteItem") as LinkButton;
+            var id = button.Attributes["data-id"];
+
+            if (e.CommandName == "DeleteItem")
+            {
+                DeleteItem(id);
+            }
+            else if (e.CommandName == "RestoreItem")
+            {
+                RestoreFromRecycleBin(id);
+            }
+            UpdateSavedState(id);
+            SetWorkbox();
+        }
+
+        // we need to publish the deletion to trigger indexing and other on-publish actions
+        protected void DeleteItem(string id)
+        {
+            // get from recycle bin and restore
+            RestoreFromRecycleBin(id);
+
+            // set Never Publish to true
+            var item = db.GetItem(id);
+            if (item == null) return;
+            item.Editing.BeginEdit();
+            item.Fields["__Never Publish"].Value = "1";
+            item.Editing.EndEdit();
+
+            // publish to all publishing targets
+            foreach (var target in GetSelectedPublishingTargets())
+            {
+                PublishOptions po = new PublishOptions(db, target, PublishMode.SingleItem, Sitecore.Context.Language, DateTime.Now);
+                po.RootItem = item;
+                po.Deep = false;
+
+                (new Publisher(po)).Publish();
+            }
+
+            item.Delete();
+        }
+
+        protected void RestoreFromRecycleBin(string id)
+        {
+            var archiveName = "recyclebin";
+            var archive = Sitecore.Data.Archiving.ArchiveManager.GetArchive(archiveName, db);
+            var itemId = new ID(id);
+            var archivalId = archive.GetArchivalId(itemId);
+            if (archivalId != Guid.Empty)
+                archive.RestoreItem(archivalId);
+        }
+
+        protected bool CheckRecycleBin(string id)
+        {
+            var archiveName = "recyclebin";
+            var archive = Sitecore.Data.Archiving.ArchiveManager.GetArchive(archiveName, db);
+            var itemId = new ID(id);
+            var archivalId = archive.GetArchivalId(itemId);
+            return archivalId != Guid.Empty;
         }
 
         protected Item GetItemFromPublishingTarget(string id)
@@ -128,50 +257,31 @@ namespace DeletionWorkbox
 
         protected void btnDeleteSelected_Click(object sender, EventArgs e)
         {
+            var targets = GetSelectedPublishingTargets();
             for (var i = 0; i < rptItemList.Items.Count; i++)
             {
                 CheckBox chk = (CheckBox)rptItemList.Items[i].FindControl("chkDeleteItem");
                 if (chk.Checked)
                 {
                     var id = chk.Attributes["data-id"];
-
-                    // TO DO: ONLY DELETE FROM SELECTED PUBLISHING TARGETS
-                    foreach (var target in publishingTargets)
-                    {
-                        DeleteItemFromTarget(id, target);
-                    }
+                    DeleteItem(id);
+                    UpdateSavedState(id);
                 }
-            }
+            }           
+            SetWorkbox();
         }
 
         protected void btnDeleteAll_Click(object sender, EventArgs e)
         {
-            // TO DO: ONLY DELETE FROM SELECTED PUBLISHING TARGETS
-            foreach (var item in workboxItems)
+            var targets = GetSelectedPublishingTargets();
+            for (var i = 0; i < rptItemList.Items.Count; i++)
             {
-                var id = item.ID.ToString();
-                foreach (var target in publishingTargets)
-                {
-                    DeleteItemFromTarget(id, target);
-                }
+                CheckBox chk = (CheckBox)rptItemList.Items[i].FindControl("chkDeleteItem");
+                var id = chk.Attributes["data-id"];
+                DeleteItem(id);
+                UpdateSavedState(id);
             }
-        }
-
-        protected void DeleteItemFromTarget(string id, Item target)
-        {
-            var targetDatabaseName = target["Target database"];
-            if (string.IsNullOrEmpty(targetDatabaseName))
-                return;
-
-            var targetDatabase = Sitecore.Configuration.Factory.GetDatabase(targetDatabaseName);
-            if (targetDatabase == null)
-                return;
-
-            var tempItem = targetDatabase.GetItem(id);
-            if (tempItem == null)
-                return;
-
-            tempItem.Delete();
+            SetWorkbox();
         }
 
         protected void btnRestoreSelected_Click(object sender, EventArgs e)
@@ -182,72 +292,36 @@ namespace DeletionWorkbox
                 if (chk.Checked)
                 {
                     var id = chk.Attributes["data-id"];
-                    // find first occurance of this item in a database
-                    // TO DO: SELECT SOURCE TO RESTORE FROM
-
-                    var item = GetItemFromPublishingTarget(id);
-                    if (item == null) continue;
-
-                    RestoreItem(item);
+                    RestoreFromRecycleBin(id);
+                    UpdateSavedState(id);
                 }
             }
+
+            SetWorkbox();
         }
 
         protected void btnRestoreAll_Click(object sender, EventArgs e)
         {
-            foreach (var item in workboxItems)
+            for (var i = 0; i < rptItemList.Items.Count; i++)
             {
-                RestoreItem(item);
+                CheckBox chk = (CheckBox)rptItemList.Items[i].FindControl("chkDeleteItem");
+                var id = chk.Attributes["data-id"];
+                RestoreFromRecycleBin(id);
+                UpdateSavedState(id);
             }
+
+            SetWorkbox();
         }
 
-        protected void RestoreItem(Item item)
+        protected void rptTargetDatabases_ItemDataBound(object sender, RepeaterItemEventArgs e)
         {
-            // To Do: SELECT SOURCE TO RESTORE FROM
+            Item target = e.Item.DataItem as Item;
+       
+            CheckBox checkbox = e.Item.FindControl("chkSelectTarget") as CheckBox;
+            Literal name = e.Item.FindControl("litTarget") as Literal;
 
-            if (db.GetItem(item.ID.ToString()) != null) return;
-            var newItem = CreateItem(item);
-            Put(item, newItem, true);
-        }
-
-        public Item CreateItem(Item item)
-        {
-            var parentPath = item.Parent.Paths.Path;
-            Item newItem = null;
-            using (new SecurityDisabler())
-            {
-                var parent = db.GetItem(parentPath);
-                if (parent == null)
-                {
-                    CreateItem(item.Parent);
-                }
-                else
-                {
-                    newItem = parent.Add(item.Name, item.Template);
-                }
-            }
-            return newItem;
-        }
-
-        public void Put(Item source, Item destination, bool deep)
-        {
-            using (new ProxyDisabler())
-            {
-                ItemSerializerOptions defaultOptions = ItemSerializerOptions.GetDefaultOptions();
-                defaultOptions.AllowDefaultValues = false;
-                defaultOptions.AllowStandardValues = false;
-                defaultOptions.ProcessChildren = deep;
-                string outerXml = source.GetOuterXml(defaultOptions);
-                try
-                {
-                    destination.Paste(outerXml, false, PasteMode.Overwrite);
-                    Log.Audit(this, "Transfer from {0} to {1}. Deep: {2}", new[] { AuditFormatter.FormatItem(source), AuditFormatter.FormatItem(destination), deep.ToString() });
-                }
-                catch (TemplateNotFoundException)
-                {
-                    // Handle the template not found exception
-                }
-            }
+            checkbox.Checked = true;
+            name.Text = target["Target database"];
         }
     }
 }
