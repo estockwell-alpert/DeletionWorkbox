@@ -28,9 +28,11 @@ namespace DeletionWorkbox
                     {
                         var workbox = db.GetItem("/sitecore/system/Modules/Deletion Workbox/Workbox");
                         if (workbox == null) return;
+                        workbox.Locking.Unlock();
                         workbox.Editing.BeginEdit();
                         workbox.Fields["Deleted Items"].Value += ids + "|";
                         workbox.Editing.EndEdit();
+                        workbox.Locking.Lock();
                     }
 
                 }

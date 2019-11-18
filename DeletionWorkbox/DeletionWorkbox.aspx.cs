@@ -69,7 +69,10 @@ namespace DeletionWorkbox
                     if (tempItem != null && !items.Any(x => x.ID.Equals(tempItem.ID)) && tempItem.Security.CanRead(user) && tempItem.Security.CanDelete(user))
                     {
                         items.Add(tempItem);
-                        continue;
+                    }
+                    else
+                    {
+                        UpdateSavedState(id);
                     }
                 }
             }
@@ -87,9 +90,12 @@ namespace DeletionWorkbox
 
             using (new SecurityDisabler())
             {
+                workbox.Locking.Unlock();
                 workbox.Editing.BeginEdit();
-                workbox.Fields["Deleted Items"].Value = workbox.Fields["Deleted Items"].Value.ToLower().Replace(id.ToLower() + "|", "");
+                var value = workbox.Fields["Deleted Items"].Value.ToLower().Replace(id.ToLower() + "|", "");
+                workbox.Fields["Deleted Items"].Value = value;
                 workbox.Editing.EndEdit();
+                workbox.Locking.Lock();
             }
         }
 
@@ -311,6 +317,55 @@ namespace DeletionWorkbox
 
             checkbox.Checked = true;
             name.Text = target["Target database"];
+        }
+
+        protected void btnRefresh_Click(object sender, EventArgs e)
+        {
+            SetWorkbox();
+        }
+
+        protected void btnScan_Click(object sender, EventArgs e)
+        {
+            var workbox = db.GetItem("/sitecore/system/Modules/Deletion Workbox/Workbox");
+            if (workbox == null) return;
+
+            var ids = new List<string>();
+            foreach (var target in publishingTargets)
+            {
+                var targetDatabaseName = target["Target database"];
+                if (string.IsNullOrEmpty(targetDatabaseName))
+                    continue;
+
+                var targetDatabase = Sitecore.Configuration.Factory.GetDatabase(targetDatabaseName);
+                if (targetDatabase == null)
+                    continue;
+
+                var home = targetDatabase.GetItem("/sitecore/content");
+                if (home == null) continue;
+
+                var allChildren = home.Axes.GetDescendants().Where(x => !ids.Any(y => y == x.ID.ToString()));
+                foreach (var child in allChildren)
+                {
+                    var masterItem = db.GetItem(child.ID.ToString());
+                    if (masterItem == null)
+                    {
+                        ids.Add(child.ID.ToString());
+                    }
+                }
+            }
+
+            var idString = String.Join("|", ids).ToLower();
+
+            using (new SecurityDisabler())
+            {
+                workbox.Locking.Unlock();
+                workbox.Editing.BeginEdit();
+                workbox.Fields["Deleted Items"].Value = idString;
+                workbox.Editing.EndEdit();
+                workbox.Locking.Lock();
+            }
+
+            SetWorkbox();
         }
     }
 }

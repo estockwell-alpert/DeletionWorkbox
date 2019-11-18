@@ -1,20 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Web;
-using System.Web.UI;
 using System.Web.UI.WebControls;
-using System.Xml;
-using System.Net;
-using System.IO;
-using System.ServiceModel;
-using System.Web.Configuration;
-using Sitecore.Diagnostics;
 using Sitecore.Data;
 using Sitecore.Collections;
 using Sitecore.Data.Items;
-using Sitecore.Data.Proxies;
-using Sitecore.Exceptions;
 using Sitecore.SecurityModel;
 using Sitecore.Publishing;
 
@@ -40,7 +30,7 @@ namespace DeletionWorkbox
                 rptTargetDatabases.DataSource = publishingTargets;
                 rptTargetDatabases.DataBind();
 
-                SetWorkbox();  
+                SetWorkbox();
             }
         }
 
@@ -79,7 +69,10 @@ namespace DeletionWorkbox
                     if (tempItem != null && !items.Any(x => x.ID.Equals(tempItem.ID)) && tempItem.Security.CanRead(user) && tempItem.Security.CanDelete(user))
                     {
                         items.Add(tempItem);
-                        continue;
+                    }
+                    else
+                    {
+                        UpdateSavedState(id);
                     }
                 }
             }
@@ -97,9 +90,12 @@ namespace DeletionWorkbox
 
             using (new SecurityDisabler())
             {
+                workbox.Locking.Unlock();
                 workbox.Editing.BeginEdit();
-                workbox.Fields["Deleted Items"].Value = workbox.Fields["Deleted Items"].Value.ToLower().Replace(id.ToLower() + "|", "");
+                var value = workbox.Fields["Deleted Items"].Value.ToLower().Replace(id.ToLower() + "|", "");
+                workbox.Fields["Deleted Items"].Value = value;
                 workbox.Editing.EndEdit();
+                workbox.Locking.Lock();
             }
         }
 
@@ -131,7 +127,7 @@ namespace DeletionWorkbox
                 PlaceHolder ph = e.Item.FindControl("phItem") as PlaceHolder;
                 ph.Visible = false;
                 return;
-            }          
+            }
 
             CheckBox checkbox = e.Item.FindControl("chkDeleteItem") as CheckBox;
             Literal name = e.Item.FindControl("litName") as Literal;
@@ -266,7 +262,7 @@ namespace DeletionWorkbox
                     DeleteItem(id);
                     UpdateSavedState(id);
                 }
-            }           
+            }
             SetWorkbox();
         }
 
@@ -315,12 +311,61 @@ namespace DeletionWorkbox
         protected void rptTargetDatabases_ItemDataBound(object sender, RepeaterItemEventArgs e)
         {
             Item target = e.Item.DataItem as Item;
-       
+
             CheckBox checkbox = e.Item.FindControl("chkSelectTarget") as CheckBox;
             Literal name = e.Item.FindControl("litTarget") as Literal;
 
             checkbox.Checked = true;
             name.Text = target["Target database"];
+        }
+
+        protected void btnRefresh_Click(object sender, EventArgs e)
+        {
+            SetWorkbox();
+        }
+
+        protected void btnScan_Click(object sender, EventArgs e)
+        {
+            var workbox = db.GetItem("/sitecore/system/Modules/Deletion Workbox/Workbox");
+            if (workbox == null) return;
+
+            var ids = new List<string>();
+            foreach (var target in publishingTargets)
+            {
+                var targetDatabaseName = target["Target database"];
+                if (string.IsNullOrEmpty(targetDatabaseName))
+                    continue;
+
+                var targetDatabase = Sitecore.Configuration.Factory.GetDatabase(targetDatabaseName);
+                if (targetDatabase == null)
+                    continue;
+
+                var home = targetDatabase.GetItem("/sitecore/content");
+                if (home == null) continue;
+
+                var allChildren = home.Axes.GetDescendants().Where(x => !ids.Any(y => y == x.ID.ToString()));
+                foreach (var child in allChildren)
+                {
+                    var masterItem = db.GetItem(child.ID.ToString());
+                    if (masterItem == null)
+                    {
+                        ids.Add(child.ID.ToString());
+                    }
+                }
+            }
+
+            var idString = String.Join("|", ids).ToLower();
+
+            using (new SecurityDisabler())
+            {
+                workbox.Locking.Unlock();
+                workbox.Editing.BeginEdit();
+                workbox.Fields["Deleted Items"].Value = idString;
+                workbox.Editing.EndEdit();
+                workbox.Locking.Lock();
+            }
+
+            SetWorkbox();
         }
     }
 }

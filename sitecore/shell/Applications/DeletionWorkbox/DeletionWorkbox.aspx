@@ -115,16 +115,16 @@ td.buttons a:hover {
 }
 
 table.targets {
-    position: fixed;
-    top:0;
     background: #fafafa;
    -webkit-box-shadow: 0 4px 4px -2px #000000;
    -moz-box-shadow: 0 4px 4px -2px #000000;
         box-shadow: 0 4px 4px -2px #000000;
 }
 
-table.items{
-    margin-top:105px;
+table.targets.fixed{
+    position:fixed;
+    top:0;
+    z-index:9;
 }
 
 .loading-modal {
@@ -153,6 +153,18 @@ table.items{
     }
 }
 
+.bottom-buttons a{
+    margin-right:12px;
+}
+
+a#btnRefresh {
+    color: #2694C0;
+    text-decoration: none;
+}
+
+a#btnRefresh:hover {
+    text-decoration: underline;
+}
 </style>
 
 <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css" />
@@ -163,6 +175,22 @@ table.items{
     $(document).ready(function () {
         $("a").on("click", function () {
             $(".loading-modal").show();
+        });
+
+        var top = $('table.targets').offset().top;
+
+        $(window).scroll(function (event) {
+            var y = $(this).scrollTop();
+            console.log("y: " + y + ", top: " + top);
+            if (y >= top) {
+                $('table.targets').addClass('fixed');
+                var height = $("table.targets").height();
+                $("table.items").css("margin-top", height);
+            }
+            else {
+                $('table.targets').removeClass('fixed');
+                $("table.items").css("margin-top", "0");
+            }
         });
     })
 
@@ -206,6 +234,12 @@ table.items{
                             <span>Deleted Items</span>
                         </td>                        
                     </tr>
+                    <tr>
+                        <td style="position:absolute;right:0;padding:10px;">
+                                                <asp:LinkButton ID="btnRefresh" runat="server" Text="Refresh" OnClick="btnRefresh_Click" />
+
+                        </td>
+                    </tr>
                     <asp:Repeater ID="rptItemList" OnItemDataBound="rptItemList_ItemDataBound" runat="server" OnItemCommand="rptItemList_ItemCommand">
                             <ItemTemplate>
                                 <asp:PlaceHolder runat="server" ID="phItem">
@@ -232,6 +266,19 @@ table.items{
                             <asp:LinkButton ID="btnDeleteAll" runat="server" OnClick="btnDeleteAll_Click">Delete (all)</asp:LinkButton>
                             <asp:LinkButton ID="btnRestoreSelected" runat="server" OnClick="btnRestoreSelected_Click">Restore (selected)</asp:LinkButton>
                             <asp:LinkButton ID="btnRestoreAll" runat="server" OnClick="btnRestoreAll_Click">Restore (all)</asp:LinkButton>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <table style="margin-top:20px;">
+                <tbody>
+                    <tr>
+                        <td class="header">Tools</td>
+                    </tr>
+                    <tr>
+                        <td class="buttons">
+                            <asp:LinkButton ID="btnScan" runat="server" Text="Initialize Workbox" OnClick="btnScan_Click"></asp:LinkButton>
+                            <span style="margin-left:8px;font-size:13px;"> - Initialize the workbox by finding all items that exist in at least one publishing target but not master. This is usually only necessary after initial installation. THIS MAY TAKE A LONG TIME.</span>
                         </td>
                     </tr>
                 </tbody>
