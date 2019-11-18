@@ -1,20 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Web;
-using System.Web.UI;
 using System.Web.UI.WebControls;
-using System.Xml;
-using System.Net;
-using System.IO;
-using System.ServiceModel;
-using System.Web.Configuration;
-using Sitecore.Diagnostics;
 using Sitecore.Data;
 using Sitecore.Collections;
 using Sitecore.Data.Items;
-using Sitecore.Data.Proxies;
-using Sitecore.Exceptions;
 using Sitecore.SecurityModel;
 using Sitecore.Publishing;
 
@@ -40,7 +30,7 @@ namespace DeletionWorkbox
                 rptTargetDatabases.DataSource = publishingTargets;
                 rptTargetDatabases.DataBind();
 
-                SetWorkbox();  
+                SetWorkbox();
             }
         }
 
@@ -131,7 +121,7 @@ namespace DeletionWorkbox
                 PlaceHolder ph = e.Item.FindControl("phItem") as PlaceHolder;
                 ph.Visible = false;
                 return;
-            }          
+            }
 
             CheckBox checkbox = e.Item.FindControl("chkDeleteItem") as CheckBox;
             Literal name = e.Item.FindControl("litName") as Literal;
@@ -266,7 +256,7 @@ namespace DeletionWorkbox
                     DeleteItem(id);
                     UpdateSavedState(id);
                 }
-            }           
+            }
             SetWorkbox();
         }
 
@@ -315,7 +305,7 @@ namespace DeletionWorkbox
         protected void rptTargetDatabases_ItemDataBound(object sender, RepeaterItemEventArgs e)
         {
             Item target = e.Item.DataItem as Item;
-       
+
             CheckBox checkbox = e.Item.FindControl("chkSelectTarget") as CheckBox;
             Literal name = e.Item.FindControl("litTarget") as Literal;
 
