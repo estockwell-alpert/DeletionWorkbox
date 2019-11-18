@@ -22,14 +22,24 @@ Access the tool in the Sitecore Start menu (right side) or at [your site]/siteco
 Items will only be available in the workbox if the current user has access to view and delete them. 
 
 # Files included in Package:
-\bin\DeletionWorkbox.dll</li>
+\bin\DeletionWorkbox.dll
+
 \App_Config\Include\DeletionWorkboxModule\DeletionWorkboxPipeline.config
+
 \sitecore\shell\Applications\DeletionWorkbox\DeletionWorkbox.aspx
+
 /temp/IconCache/office/16x16/remove_version.png
+
 /temp/IconCache/office/24x24/remove_version.png
+
 /temp/IconCache/office/32x32/remove_version.png
+
 /sitecore/shell/Themes/Standard/Images/ProgressIndicator/sc-spinner32.gif
+
 core:/sitecore/content/Applications/Deletion Workbox
+
 core:/sitecore/content/Documents and settings/All users/Start menu/Right/Deletion Publishing Workbox
+
 master:/sitecore/templates/Modules/Deletion Workbox Module/Workbox
+
 master:/sitecore/system/Modules/Deletion Workbox/Workbox
