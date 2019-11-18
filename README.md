@@ -6,9 +6,10 @@ This module is intended to help in the instances where a user has deleted an ite
 The Deletion Workbox also provides users with a visual interface that can show them all of the items that exist in web (or any other publishing target) but no longer exist in master. This can help users to view and keep track of all unpublished deletions.
 
 # Installation
-User the Installation Wizard to install the .zip package (available in the latest Release). When prompted, choose <b>merge<b>. 
-
-<b>Important</b>: If installing a newer version, always use <b>merge<b/> instead of overwrite or you will lose all of the items currently in the workbox.
+User the Installation Wizard to install the .zip package (available in the latest Release). When prompted, choose <b>merge<b> for Sitecore items and <b>overwrite</b> for files. 
+  
+# Set Up
+Once the Workbox is installed, click Initialize Workbox to get all items that have been deleted from master but still exist in at least one publishing target. After you've done this once, you should not have to again, as the custom pipeline will automatically add items as they are deleted once the module is installed.
 
 # Dependencies
 This module has been tested in Sitecore 8.2 and 9.0. It has not been tested in earlier versions of Sitecore but may work.
