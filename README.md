@@ -9,7 +9,7 @@ The Deletion Workbox also provides users with a visual interface that can show t
 User the Installation Wizard to install the .zip package (available in the latest Release). When prompted, choose <b>merge</b> for Sitecore items and <b>overwrite</b> for files. 
   
 # Set Up
-Once the Workbox is installed, click Initialize Workbox to get all items that have been deleted from master but still exist in at least one publishing target. After you've done this once, you should not have to again, as the custom pipeline will automatically add items as they are deleted once the module is installed.
+Once the Workbox is installed, you can click Initialize Workbox to get all items that have been deleted from master but still exist in at least one publishing target. After you've done this once, you should not have to do it again, as the custom pipeline will automatically add items as they are deleted once the module is installed. This is optional and only needed if you want to add items to the workbox that were deleted prior to installation.
 
 # Dependencies
 This module has been tested in Sitecore 8.2 and 9.0. It has not been tested in earlier versions of Sitecore but may work.
