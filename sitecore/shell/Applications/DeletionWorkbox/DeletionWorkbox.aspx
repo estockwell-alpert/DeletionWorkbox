@@ -165,6 +165,20 @@ a#btnRefresh {
 a#btnRefresh:hover {
     text-decoration: underline;
 }
+
+#btnScan{
+        display: inline-block;
+    width: 98px;
+    vertical-align: top;
+}
+
+.buttons span{
+        margin-left: 8px;
+    font-size: 13px;
+    display: inline-block;
+    width: calc(100% - 173px);
+    vertical-align: top;
+}
 </style>
 
 <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css" />
@@ -278,7 +292,7 @@ a#btnRefresh:hover {
                     <tr>
                         <td class="buttons">
                             <asp:LinkButton ID="btnScan" runat="server" Text="Initialize Workbox" OnClick="btnScan_Click"></asp:LinkButton>
-                            <span style="margin-left:8px;font-size:13px;"> - Initialize the workbox by finding all items that exist in at least one publishing target but not master. This is usually only necessary after initial installation. THIS MAY TAKE A LONG TIME.</span>
+                            <span style="margin-left:8px;font-size:13px;">Initialize the workbox by finding all items that exist in at least one publishing target but not master. This is usually only necessary after initial installation. THIS MAY TAKE A LONG TIME.</span>
                         </td>
                     </tr>
                 </tbody>
