@@ -11,6 +11,7 @@ User the Installation Wizard to install the .zip package (available in the lates
 <b>Important</b>: If installing a newer version, always use <b>merge<b/> instead of overwrite or you will lose all of the items currently in the workbox.
 
 # Dependencies
+This module has been tested in Sitecore 8.2 and 9.0. It has not been tested in earlier versions of Sitecore but may work.
 
 # To Use
 You must be logged into Sitecore to access the tool.
