@@ -347,7 +347,7 @@ namespace DeletionWorkbox
                 foreach (var child in allChildren)
                 {
                     var masterItem = db.GetItem(child.ID.ToString());
-                    if (masterItem == null)
+                    if (masterItem == null && CheckRecycleBin(child.ID.ToString()))
                     {
                         ids.Add(child.ID.ToString());
                     }
